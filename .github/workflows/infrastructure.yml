@@ -1,18 +1,11 @@
-# This is a basic workflow to help you get started with Actions
+name: Deploy Infrastructure for Azure
 
-name: infrastructure to azure
-
-# Controls when the workflow will run
 on: [pull_request, workflow_dispatch]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  deployResourceGroup:
+    environment: development
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - uses: actions/checkout@v4
       - uses: azure/login@v2
@@ -22,4 +15,41 @@ jobs:
         run: |
           az deployment sub create \
             --location westeurope \
-            --template-file ./main.bicep 
+            --template-file ./main.bicep \
+            --output json > deployment_output-${{ github.run_number }}.json
+      - name: Upload deployment output
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-output-${{ github.run_number }}
+          path: deployment_output-${{ github.run_number }}.json
+
+  deployACR:
+    needs: deployResources
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Download deployment output
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-output-${{ github.run_number }}
+
+      - name: Read ACR name
+        run: |
+          ACR_NAME=$(jq -r '.properties.outputs.containerRegistryName.value' deployment_output-${{ github.run_number }}.json)
+          echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
+
+      - name: Install xmllint
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+
+      - name: Extract version from project
+        run: |
+          VNo="/project.xml"
+          VERSION=$(xmllint --xpath 'string(//Version|//PropertyGroup/Version)' "$VNo")
+          [ -z "$VERSION" ] && echo "Missing <Version> in $VNo" && exit 1
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Project version: $VERSION"

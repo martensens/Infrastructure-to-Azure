@@ -15,6 +15,14 @@ var resGroupName string = 'rg_${environmentName}_${projectName}'
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2025-04-01' = {
   name: resGroupName
   location: location
-
-
 }
+
+module containerRegistryModule 'acr.bicep' = {
+  name: 'containerRegistryModule'
+  scope: rg
+  params: {
+    acrName: 'acr${projectname}${environment}'
+  }
+}
+
+output containerRegistryName string = containerRegistryModule.outputs.acrName 
