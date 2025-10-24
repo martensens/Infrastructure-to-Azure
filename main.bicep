@@ -19,7 +19,7 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2025-04-01' = {
 
 module containerRegistryModule 'acr.bicep' = {
   name: 'containerRegistryModule'
-  scope: resGroupName
+  scope: resourceGroup
   params: {
     acrName: 'acr_${environmentName}_${projectName}'
   }
