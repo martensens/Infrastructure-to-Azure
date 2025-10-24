@@ -24,7 +24,7 @@ jobs:
           path: deployment_output-${{ github.run_number }}.json
 
   deployACR:
-    needs: deployResources
+    needs: deployResourceGroup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
