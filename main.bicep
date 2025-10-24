@@ -21,7 +21,7 @@ module containerRegistryModule 'acr.bicep' = {
   name: 'containerRegistryModule'
   scope: resourceGroup
   params: {
-    acrName: 'acr_${environmentName}_${projectName}'
+    acrName: 'acr${environmentName}${projectName}'
   }
 }
 
