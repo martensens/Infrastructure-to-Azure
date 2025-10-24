@@ -1,5 +1,6 @@
 targetScope = 'subscription'
 
+
 @description ('Name des Projekts')
 param projectName string = 'infrastructure'
 
