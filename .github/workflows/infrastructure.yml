@@ -48,8 +48,8 @@ jobs:
 
       - name: Extract version from project
         run: |
-          VNo="/project.xml"
-          VERSION=$(xmllint --xpath 'string(//Version|//PropertyGroup/Version)' "$VNo")
-          [ -z "$VERSION" ] && echo "Missing <Version> in $VNo" && exit 1
+          CSPROJ="src/project.csproj"
+          VERSION=$(xmllint --xpath 'string(//Version|//PropertyGroup/Version)' "$CSPROJ")
+          [  -z "$VERSION"  ] && echo "Missing <Version> in $CSPROJ" && exit 1
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Project version: $VERSION"
