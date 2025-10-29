@@ -53,7 +53,7 @@ jobs:
 
       - name: Extract version from project
         run: |
-          CSPROJ="project.csproj"
+          CSPROJ="project.xml"
           if [ ! -f "$CSPROJ" ]; then
             echo "ERROR: File not found: $CSPROJ"
             exit 1
