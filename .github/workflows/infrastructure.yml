@@ -62,3 +62,35 @@ jobs:
           [  -z "$VERSION"  ] && echo "Missing <Version> in $CSPROJ" && exit 1
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Project version: $VERSION"
+      
+      - name: Compute tags
+        run: |
+          REPO="infrastructure"
+          BRANCH= "${GITHUB_REF#refs/heads/}"
+          echo "REPO=$REPO" >> $GITHUB_ENV
+          
+          if az acr repository list -n "$ACR_AME" -o tsv | grep -Fxq "$REPO"; then
+            REPO_EXISTS=1
+          else
+            REPO_EXISTS=0
+          fi
+
+          if [ "$BRANCH"="main" ]; then
+            if [ "REPO_EXISTS" -eq 1 ]; then
+              if az acr repository show-tags -n "$ACR_NAME" --repository "$REPO" -o tsv  |  grep -Fxq "$VERSION"; then
+                echo "Tag $VERSION already exists-bump <Version>."; exit 1
+              fi
+            fi
+            IMAGE_TAG="$VERSION"
+          else
+              if [ "$REPO_EXISTS" -eq 1 ]; then
+                COUNT=$(az acr  repository show-tags -n "$ACR_NAME" --repository "$REPO" -o tsv \
+                  |  awk -v v="$VERSION-rc." 'index($0,v)==1'  |  wc -l)
+                RC_NUM=$((COUNT+1))
+              else
+                RC_NUM=1
+              fi
+              IMAGE_TAG="${VERSION}-rc.${RC_NUM}"
+          fi
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "Computed image tag: $IMAGE_TAG"
