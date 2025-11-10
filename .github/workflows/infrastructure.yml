@@ -105,5 +105,5 @@ jobs:
           az acr build \
           --registry "$ACR_NAME" \
           --image "$REPO:$IMAGE_TAG" \
-          --file Dockerfile \
-          INFRASTRUCTURE-TO-AZURE
+          --file Dockerfile .
+      
