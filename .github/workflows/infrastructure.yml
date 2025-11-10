@@ -3,7 +3,7 @@ name: Deploy Infrastructure for Azure
 on: [pull_request, workflow_dispatch]
 
 jobs:
-  deployResourceGroup:
+  DeployResourceGroup:
     environment: development
     runs-on: ubuntu-latest
     steps:
@@ -24,7 +24,7 @@ jobs:
           path: deployment_output-${{ github.run_number }}.json
 
   ComputeTagsForACR:
-    needs: deployResourceGroup
+    needs: DeployResourceGroup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -101,7 +101,7 @@ jobs:
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
           echo "Computed image tag: $IMAGE_TAG"
 
-  CreateACR:
+  BuildImage:
     needs: ComputeTagsForACR
     runs-on: ubuntu-latest
     steps:
@@ -118,3 +118,6 @@ jobs:
           --image "$REPO:$IMAGE_TAG" \
           --file Dockerfile \
           INFRASTRUCTURE-TO-AZURE
+
+          echo  "ACR_Name =$ACR_NAME"
+          echo  "Image_Tag = $REPO:$IMAGE_TAG"
