@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.sdk.web">
+
+   <PropertyGroup>
+			   <ProjectName>Infrastructure</ProjectName>
+			   <Version>1.0.0</Version>
+			</PropertyGroup>
+</Project>
