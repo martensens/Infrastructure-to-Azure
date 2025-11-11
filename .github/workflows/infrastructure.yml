@@ -51,7 +51,6 @@ jobs:
       - name: Read ACR name
         run: |
           ACR_NAME=$(jq -r '.properties.outputs.containerRegistryName.value' deployment_output-${{ github.run_number }}.json)
-          ACR_NAME="acrdevinfrastructure"
           echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
 
       - name: Extract version from project
