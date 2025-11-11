@@ -12,7 +12,7 @@ $connectError = "";
 $message = "";
 
 // --------------------
-// Verbindung aufbauen
+// Verbindung aufbauen xxx
 // --------------------
 try {
     $dsn = "sqlsrv:Server=$server;Database=$database;Encrypt=yes;TrustServerCertificate=yes";
