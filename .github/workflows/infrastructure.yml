@@ -106,4 +106,12 @@ jobs:
           --registry "$ACR_NAME" \
           --image "$REPO:$IMAGE_TAG" \
           --file Dockerfile .
-      
+      - name: Delete rc tags for current versionv(main only)
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          REPO="${REPO:-infrastructure}"
+          for TAG in $(az acr repository show-tags -n "$ACR_NAME" --repository "$REPO" -o tsv \
+                                | grep -E "^${VERSION}-rc\[0-9]+$" || true); do
+              echo "Deleting rc tag $TAG"
+              az acr repository delete -n "$ACR_NAME" --image "$REPO:$TAG" --yes
+          done
