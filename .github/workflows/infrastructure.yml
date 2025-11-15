@@ -1,6 +1,7 @@
 name: Deploy Infrastructure for Azure
 
 on: [push, pull_request, workflow_dispatch]
+
 jobs:
   deployResourceGroup:
     environment: development
@@ -68,37 +69,65 @@ jobs:
       - name: Compute tags
         run: |
           set -e
+          set -o pipefail
+
+          echo "=== Begin Tag Calculation ==="
+          
           REPO="infrastructure"
           BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
           echo "Current branch: $BRANCH"
           echo "REPO=$REPO" >> $GITHUB_ENV
-          
+
+          echo "Checking if repository '$REPO' exists in ACR '$ACR_NAME'..."
+
           if az acr repository list -n "$ACR_NAME" -o tsv | grep -Fxq "$REPO"; then
             REPO_EXISTS=1
+            echo "Repository exists."
           else
             REPO_EXISTS=0
+            echo "Repository does NOT exist."
           fi
 
+          echo "=== Determining tag for branch '$BRANCH' ==="
+
           if [ "$BRANCH" = "main" ]; then
+
             if [ "$REPO_EXISTS" -eq 1 ]; then
-              if az acr repository show-tags -n "$ACR_NAME" --repository "$REPO" -o tsv | grep -Fxq "$VERSION"; then
-                echo "Tag $VERSION already exists — bump <Version>."
+              echo "Fetching tags from ACR..."
+              TAGS=$(az acr repository show-tags -n "$ACR_NAME" --repository "$REPO" -o tsv || echo "")
+              echo "Existing tags:"
+              echo "$TAGS"
+
+              if echo "$TAGS" | grep -Fxq "$VERSION"; then
+                echo "❌ Tag '$VERSION' exists already — bump <Version>."
                 exit 1
               fi
             fi
+
             IMAGE_TAG="$VERSION"
+            echo "Assigned tag: $IMAGE_TAG"
+
           else
+            echo "Non-main branch → RC tag required."
+
             if [ "$REPO_EXISTS" -eq 1 ]; then
-              COUNT=$(az acr repository show-tags -n "$ACR_NAME" --repository "$REPO" -o tsv | grep -c "^${VERSION}-rc.")
-              RC_NUM=$((COUNT + 1))
+              echo "Fetching existing RC tags..."
+              COUNT=$(az acr repository show-tags -n "$ACR_NAME" --repository "$REPO" -o tsv | \
+                      grep -c "^${VERSION}-rc" || true)
             else
-              RC_NUM=1
+              COUNT=0
             fi
-            IMAGE_TAG="${VERSION}-rc.${RC_NUM}"
+
+            RC_NUM=$((COUNT + 1))
+            IMAGE_TAG="${VERSION}-rc${RC_NUM}"
+
+            echo "Existing RC count: $COUNT"
+            echo "Assigned tag: $IMAGE_TAG"
           fi
 
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-          echo "Computed image tag: $IMAGE_TAG" 
+          echo "=== Tag Calculation Completed ==="
+
       - name: Build ACR
         run: |
           az acr build \
