@@ -2,6 +2,7 @@ name: Deploy Infrastructure for Azure
 
 on: [push, pull_request, workflow_dispatch]
 
+
 jobs:
   deployResourceGroup:
     environment: development
