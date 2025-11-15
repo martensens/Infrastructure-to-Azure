@@ -106,7 +106,7 @@ jobs:
           --registry "$ACR_NAME" \
           --image "$REPO:$IMAGE_TAG" \
           --file Dockerfile .
-      - name: Delete rc tags for current versionv(main only)
+      - name: Delete rc tags for current version (main only)
         if: ${{ github.ref == 'refs/heads/main' }}
         run: |
           REPO="${REPO:-infrastructure}"
