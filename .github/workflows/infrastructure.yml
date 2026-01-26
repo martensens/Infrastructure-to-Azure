@@ -1,0 +1,117 @@
+name: Deploy Infrastructure for Azure
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  deployResourceGroup:
+    environment: development
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Deployment ResourceGroup
+        run: |
+          az deployment sub create \
+            --location westeurope \
+            --template-file ./main.bicep \
+            --output json > deployment_output-${{ github.run_number }}.json
+      - name: Upload deployment output
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-output-${{ github.run_number }}
+          path: deployment_output-${{ github.run_number }}.json
+
+  ComputeTagsForACR:
+    needs: deployResourceGroup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2-utils jq
+
+      - name: Debug workspace
+        run: |
+          pwd
+          ls -R
+
+      - name: Download deployment output
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-output-${{ github.run_number }}
+
+      - name: Read ACR name
+        run: |
+          ACR_NAME=$(jq -r '.properties.outputs.containerRegistryName.value' deployment_output-${{ github.run_number }}.json)
+          echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
+
+      - name: Extract version from project
+        run: |
+          set -e
+          CSPROJ="project.xml"
+          if [ ! -f "$CSPROJ" ]; then
+            echo "ERROR: File not found: $CSPROJ"
+            exit 1
+          fi
+          VERSION=$(xmllint --xpath 'string(//Version|//PropertyGroup/Version)' "$CSPROJ")
+          [ -z "$VERSION" ] && echo "Missing <Version> in $CSPROJ" && exit 1
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Project version: $VERSION"
+      
+      - name: Compute tags
+        run: |
+          set -e
+          REPO="infrastructure"
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          echo "Current branch: $BRANCH"
+          echo "REPO=$REPO" >> $GITHUB_ENV
+          
+          if az acr repository list -n "$ACR_NAME" -o tsv | grep -Fxq "$REPO"; then
+            REPO_EXISTS=1
+          else
+            REPO_EXISTS=0
+          fi
+
+          if [ "$BRANCH" = "main" ]; then
+            if [ "$REPO_EXISTS" -eq 1 ]; then
+              if az acr repository show-tags -n "$ACR_NAME" --repository "$REPO" -o tsv | grep -Fxq "$VERSION"; then
+                echo "Tag $VERSION already exists — bump <Version>."
+                exit 1
+              fi
+            fi
+            IMAGE_TAG="$VERSION"
+          else
+            if [ "$REPO_EXISTS" -eq 1 ]; then
+              COUNT=$(az acr repository show-tags -n "$ACR_NAME" --repository "$REPO" -o tsv | grep -c "^${VERSION}-rc.")
+              RC_NUM=$((COUNT + 1))
+            else
+              RC_NUM=1
+            fi
+            IMAGE_TAG="${VERSION}-rc${RC_NUM}"
+          fi
+
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "Computed image tag: $IMAGE_TAG" 
+      - name: Build ACR
+        run: |
+          az acr build \
+          --registry "$ACR_NAME" \
+          --image "$REPO:$IMAGE_TAG" \
+          --file Dockerfile .
+      - name: Delete rc tags for current version (main only)
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          REPO="${REPO:-infrastructure}"
+          for TAG in $(az acr repository show-tags -n "$ACR_NAME" --repository "$REPO" -o tsv \
+                                | grep -E "^${VERSION}-rc\.[0-9]+$" || true); do
+              echo "Deleting rc tag $TAG"
+              az acr repository delete -n "$ACR_NAME" --image "$REPO:$TAG" --yes
+          done
